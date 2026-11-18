@@ -245,7 +245,7 @@ button { cursor: pointer; border: 0; background: none; }
     <textarea id="preview" readonly hidden aria-label="共有するテキスト"></textarea>
     <button class="big danger" type="button" id="resetBtn">すべて消す</button>
   </section>
-  <div class="ver">v4</div>
+  <div class="ver">v5</div>
 </main>
 
 <div class="scrim" id="scrim" hidden>
@@ -329,7 +329,7 @@ button { cursor: pointer; border: 0; background: none; }
       p = p.trim();
       try { localStorage.setItem(PASS_KEY, p); } catch (e) {}
     }
-    return p;
+    return p || '';
   }
   function schedulePush() {
     dirty = true;
