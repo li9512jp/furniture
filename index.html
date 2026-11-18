@@ -105,6 +105,8 @@ button { cursor: pointer; border: 0; background: none; }
 .add input::placeholder { color: var(--muted); }
 .sync { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: -8px; }
 .sync.err { color: var(--danger); }
+.sync button { margin-left: 8px; padding: 4px 10px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: 13px; font-weight: 600; }
+.ver { text-align: center; color: var(--muted); font-size: 12px; }
 .pill {
   padding: 10px 18px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
@@ -243,6 +245,7 @@ button { cursor: pointer; border: 0; background: none; }
     <textarea id="preview" readonly hidden aria-label="共有するテキスト"></textarea>
     <button class="big danger" type="button" id="resetBtn">すべて消す</button>
   </section>
+  <div class="ver">v4</div>
 </main>
 
 <div class="scrim" id="scrim" hidden>
@@ -309,6 +312,14 @@ button { cursor: pointer; border: 0; background: none; }
   var syncEl = document.getElementById('sync');
   var pushTimer, pushing = false, dirty = false, remoteStamp = 0;
   function status(msg, err) { syncEl.textContent = msg || ''; syncEl.className = 'sync' + (err ? ' err' : ''); }
+  function offerUpload() {
+    status('まだ誰も共有していません。');
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = 'この端末のリストを共有する';
+    b.addEventListener('click', function () { push(); });
+    syncEl.appendChild(b);
+  }
   function getPass(force) {
     var p = null;
     try { p = localStorage.getItem(PASS_KEY); } catch (e) {}
@@ -364,7 +375,7 @@ button { cursor: pointer; border: 0; background: none; }
       if (!Array.isArray(j.items)) {
         // nothing shared yet: upload what this device has
         if (initial) status('');
-        if (initial && hadLocal && state.items.length) schedulePush();
+        if (initial && hadLocal && state.items.length) offerUpload();
         return;
       }
       if (pushing || dirty) return;
