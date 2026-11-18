@@ -7,7 +7,10 @@ var pool, ready;
 
 function db() {
   if (!pool) {
-    pool = new Pool({ connectionString: process.env.POSTGRES_URL, max: 1, ssl: { rejectUnauthorized: false } });
+    // sslmode in the URL would override the ssl option below, so strip it (Supabase uses a cert pg can't verify)
+    var u = new URL(process.env.POSTGRES_URL);
+    u.searchParams.delete('sslmode');
+    pool = new Pool({ connectionString: u.toString(), max: 1, ssl: { rejectUnauthorized: false } });
   }
   if (!ready) {
     ready = pool.query(
