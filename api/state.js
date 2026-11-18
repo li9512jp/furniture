@@ -56,8 +56,8 @@ module.exports = async function (req, res) {
     }
     if (req.method === 'PUT') {
       var pass = process.env.EDIT_PASSCODE;
-      if (!pass) { res.status(500).json({ error: 'EDIT_PASSCODE not set' }); return; }
-      if ((req.headers['x-passcode'] || '') !== pass) { res.status(401).json({ error: 'bad passcode' }); return; }
+      // no EDIT_PASSCODE set -> anyone can edit
+      if (pass && (req.headers['x-passcode'] || '') !== pass) { res.status(401).json({ error: 'bad passcode' }); return; }
       var body = await readBody(req);
       if (typeof body === 'string') { try { body = JSON.parse(body || '{}'); } catch (e) { body = {}; } }
       if (!validItems(body.items)) { res.status(400).json({ error: 'bad items' }); return; }

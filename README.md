@@ -12,4 +12,4 @@
 | 変数 | 用途 |
 |---|---|
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Upstash Redis（Vercel Marketplace の Storage から接続すると自動で入る） |
-| `EDIT_PASSCODE` | 編集用の合言葉。閲覧だけなら不要 |
+| `EDIT_PASSCODE` | 編集用の合言葉（任意）。未設定なら誰でも編集できる |
