@@ -103,6 +103,8 @@ button { cursor: pointer; border: 0; background: none; }
   border: 0; border-radius: 12px;
 }
 .add input::placeholder { color: var(--muted); }
+.sync { font-size: 13px; color: var(--muted); min-height: 18px; margin-top: -8px; }
+.sync.err { color: var(--danger); }
 .pill {
   padding: 10px 18px; border-radius: 999px;
   background: var(--accent); color: var(--on-accent);
@@ -208,6 +210,7 @@ button { cursor: pointer; border: 0; background: none; }
     <input id="nameInput" type="text" maxlength="30" placeholder="冷蔵庫" aria-label="家具・家電の名前" enterkeyhint="done">
     <button class="pill" type="submit" id="addBtn">追加</button>
   </form>
+  <div class="sync" id="sync" aria-live="polite"></div>
 
   <section class="shelf pool" aria-labelledby="h-pool">
     <div class="shelf-head"><span class="dot"></span><h2 id="h-pool">未分類</h2><span class="count" data-count="pool">0</span></div>
@@ -263,11 +266,14 @@ button { cursor: pointer; border: 0; background: none; }
 <script>
 (function () {
   var KEY = 'kagu-kaden-tier-v1';
+  var PASS_KEY = 'kagu-kaden-pass';
+  var API = '/api/state';
   var ORDER = ['pool', 'must', 'want', 'later', 'owned'];
   var SHARE_ORDER = ['must', 'want', 'later', 'owned', 'pool'];
   var LABEL = { pool: '未分類', must: '必要', want: '買えたらいいな', later: '今じゃなくても', owned: '既に持ってる' };
   var SAMPLES = ['冷蔵庫', '洗濯機', 'ベッド', 'カーテン', '電子レンジ', '照明', 'ソファ', 'テレビ', 'ロボット掃除機'];
 
+  var hadLocal = false;
   var state = load();
   var selectedId = null;
   var justDragged = false;
@@ -289,13 +295,87 @@ button { cursor: pointer; border: 0; background: none; }
       var raw = localStorage.getItem(KEY);
       if (raw) {
         var s = JSON.parse(raw);
-        if (s && Array.isArray(s.items)) return s;
+        if (s && Array.isArray(s.items)) { hadLocal = true; return s; }
       }
     } catch (e) {}
     return { items: SAMPLES.map(function (n) { return { id: uid(), name: n, tier: 'pool' }; }) };
   }
   function save() {
     try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+    schedulePush();
+  }
+
+  // ---- shared storage (server) ----
+  var syncEl = document.getElementById('sync');
+  var pushTimer, pushing = false, dirty = false, remoteStamp = 0;
+  function status(msg, err) { syncEl.textContent = msg || ''; syncEl.className = 'sync' + (err ? ' err' : ''); }
+  function getPass(force) {
+    var p = null;
+    try { p = localStorage.getItem(PASS_KEY); } catch (e) {}
+    if (!p || force) {
+      p = window.prompt('編集用の合言葉を入力してください');
+      if (p === null) return null;
+      p = p.trim();
+      try { localStorage.setItem(PASS_KEY, p); } catch (e) {}
+    }
+    return p;
+  }
+  function schedulePush() {
+    dirty = true;
+    clearTimeout(pushTimer);
+    pushTimer = setTimeout(push, 600);
+  }
+  function push(retry) {
+    if (pushing) { schedulePush(); return; }
+    var pass = getPass(retry);
+    if (pass === null) { status('合言葉がないので、この端末だけに保存しました', true); return; }
+    pushing = true; dirty = false;
+    status('保存中…');
+    fetch(API, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'x-passcode': pass },
+      body: JSON.stringify({ items: state.items })
+    }).then(function (r) {
+      if (r.status === 401) {
+        pushing = false;
+        try { localStorage.removeItem(PASS_KEY); } catch (e) {}
+        if (!retry) { push(true); return; }
+        status('合言葉が違います', true);
+        return;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json().then(function (j) {
+        pushing = false;
+        remoteStamp = j.updatedAt || Date.now();
+        status('みんなに共有しました');
+        if (dirty) schedulePush();
+      });
+    }).catch(function () {
+      pushing = false;
+      status('保存できませんでした（通信エラー）', true);
+    });
+  }
+  function pull(initial) {
+    return fetch(API, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      if (!Array.isArray(j.items)) {
+        // nothing shared yet: upload what this device has
+        if (initial) status('');
+        if (initial && hadLocal && state.items.length) schedulePush();
+        return;
+      }
+      if (pushing || dirty) return;
+      if (j.updatedAt && j.updatedAt <= remoteStamp) return;
+      remoteStamp = j.updatedAt || 0;
+      state.items = j.items;
+      try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+      if (!selectedId) render();
+      if (initial) status('');
+    }).catch(function () {
+      if (initial) status('共有データを読めませんでした。この端末の内容を表示しています', true);
+    });
   }
   function find(id) {
     for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
@@ -470,6 +550,10 @@ button { cursor: pointer; border: 0; background: none; }
   }
 
   render();
+  status('読み込み中…');
+  pull(true);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) pull(false); });
+  setInterval(function () { if (!document.hidden) pull(false); }, 20000);
 })();
 </script>
 </body>
