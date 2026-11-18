@@ -1,0 +1,7 @@
+{
+  "name": "furniture-tier-list",
+  "private": true,
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
+}
