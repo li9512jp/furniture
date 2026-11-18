@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>家具家電ティアリスト</title>
+<style>
+/* Layout idea: iOS grouped list. Large title, a filled input row, then one
+   rounded white group per tier with a coloured dot; pieces are tinted capsules.
+   Tapping a piece opens an action sheet. */
+:root {
+  --bg: #F2F2F7;
+  --surface: #FFFFFF;
+  --fill: #E9E9EE;
+  --ink: #000000;
+  --muted: #8A8A8E;
+  --line: #D1D1D6;
+  --accent: #007AFF;
+  --on-accent: #FFFFFF;
+  --pool: #8E8E93;
+  --must: #FF3B30;
+  --want: #FF9500;
+  --later: #5856D6;
+  --owned: #34C759;
+  --danger: #FF3B30;
+  --line-green: #06C755;
+  --scrim: rgba(0,0,0,.3);
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #000000;
+    --surface: #1C1C1E;
+    --fill: #2C2C2E;
+    --ink: #FFFFFF;
+    --muted: #98989F;
+    --line: #38383A;
+    --accent: #0A84FF;
+    --on-accent: #FFFFFF;
+    --pool: #8E8E93;
+    --must: #FF453A;
+    --want: #FF9F0A;
+    --later: #7D7AFF;
+    --owned: #30D158;
+    --danger: #FF453A;
+    --scrim: rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #1C1C1E;
+  --fill: #2C2C2E;
+  --ink: #FFFFFF;
+  --muted: #98989F;
+  --line: #38383A;
+  --accent: #0A84FF;
+  --on-accent: #FFFFFF;
+  --pool: #8E8E93;
+  --must: #FF453A;
+  --want: #FF9F0A;
+  --later: #7D7AFF;
+  --owned: #30D158;
+  --danger: #FF453A;
+  --scrim: rgba(0,0,0,.55);
+}
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.4;
+  -webkit-text-size-adjust: 100%;
+  -webkit-font-smoothing: antialiased;
+}
+.wrap {
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+h1 {
+  font-size: 34px; font-weight: 700; letter-spacing: -0.01em;
+  line-height: 1.2; margin: 0;
+  text-wrap: balance;
+}
+button, input, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; border: 0; background: none; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* add row */
+.add { display: flex; gap: 10px; align-items: center; }
+.add input {
+  flex: 1; min-width: 0;
+  padding: 10px 14px;
+  background: var(--fill);
+  border: 0; border-radius: 12px;
+}
+.add input::placeholder { color: var(--muted); }
+.pill {
+  padding: 10px 18px; border-radius: 999px;
+  background: var(--accent); color: var(--on-accent);
+  font-weight: 600; white-space: nowrap;
+}
+.pill:active, .big:active, .row:active { opacity: .6; }
+
+/* groups */
+.shelf {
+  --tc: var(--pool);
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 12px 14px 14px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.shelf.must  { --tc: var(--must); }
+.shelf.want  { --tc: var(--want); }
+.shelf.later { --tc: var(--later); }
+.shelf.owned { --tc: var(--owned); }
+.shelf-head { display: flex; align-items: center; gap: 8px; }
+.dot { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); flex: none; }
+.shelf-head h2 { font-size: 17px; font-weight: 600; line-height: 1.3; margin: 0; }
+.count { margin-left: auto; color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+.zone {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  min-height: 40px; align-content: flex-start;
+}
+.zone:empty { background: var(--bg); border-radius: 10px; }
+
+/* pieces */
+.chip {
+  padding: 8px 14px;
+  background: var(--fill);
+  background: color-mix(in srgb, var(--tc, var(--pool)) 18%, var(--surface));
+  border-radius: 999px;
+  font-size: 16px; font-weight: 500;
+  line-height: 1.3; text-align: left;
+  max-width: 100%; overflow-wrap: anywhere;
+  cursor: grab;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+  touch-action: manipulation;
+}
+.chip.selected { outline: 3px solid var(--accent); outline-offset: 1px; }
+.chip.ghost { opacity: 0.3; }
+.chip.dragging { box-shadow: 0 10px 28px rgba(0,0,0,.28); cursor: grabbing; }
+
+/* share */
+.share { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.big {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; padding: 14px 18px; border-radius: 14px;
+  font-weight: 600; text-decoration: none;
+}
+.big.line { background: var(--line-green); color: #fff; }
+.big.plain { background: var(--surface); color: var(--accent); }
+.big.danger { background: var(--surface); color: var(--danger); font-weight: 400; }
+.big[aria-disabled="true"], .big:disabled { opacity: 0.4; pointer-events: none; }
+#preview {
+  width: 100%; min-height: 160px; padding: 12px 14px;
+  background: var(--surface); color: var(--ink);
+  border: 0; border-radius: 14px; resize: vertical;
+}
+#preview[hidden] { display: none; }
+
+/* action sheet */
+.scrim { position: fixed; inset: 0; background: var(--scrim); display: flex; align-items: flex-end; }
+.scrim[hidden] { display: none; }
+.sheet {
+  width: 100%; max-width: 600px; margin: 0 auto;
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 8px;
+  animation: up .22s ease-out;
+}
+@keyframes up { from { transform: translateY(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.sheet-group { background: var(--surface); border-radius: 14px; overflow: hidden; }
+.sheet-title { padding: 12px; }
+.sheet-title input {
+  width: 100%; padding: 10px 14px;
+  background: var(--fill); color: var(--ink);
+  border: 0; border-radius: 10px;
+  text-align: center; font-size: 17px; font-weight: 600;
+}
+.row {
+  --tc: var(--pool);
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 15px 16px;
+  border-top: 0.5px solid var(--line);
+  color: var(--accent); font-size: 18px;
+}
+.row.must { --tc: var(--must); } .row.want { --tc: var(--want); }
+.row.later { --tc: var(--later); } .row.owned { --tc: var(--owned); }
+.row.del { color: var(--danger); }
+.row.cancel { border-top: 0; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>家具家電ティアリスト</h1>
+
+  <form class="add" id="addForm" autocomplete="off">
+    <input id="nameInput" type="text" maxlength="30" placeholder="冷蔵庫" aria-label="家具・家電の名前" enterkeyhint="done">
+    <button class="pill" type="submit" id="addBtn">追加</button>
+  </form>
+
+  <section class="shelf pool" aria-labelledby="h-pool">
+    <div class="shelf-head"><span class="dot"></span><h2 id="h-pool">未分類</h2><span class="count" data-count="pool">0</span></div>
+    <div class="zone" data-zone="pool"></div>
+  </section>
+
+  <section class="shelf must" aria-labelledby="h-must">
+    <div class="shelf-head"><span class="dot"></span><h2 id="h-must">必要</h2><span class="count" data-count="must">0</span></div>
+    <div class="zone" data-zone="must"></div>
+  </section>
+
+  <section class="shelf want" aria-labelledby="h-want">
+    <div class="shelf-head"><span class="dot"></span><h2 id="h-want">買えたらいいな</h2><span class="count" data-count="want">0</span></div>
+    <div class="zone" data-zone="want"></div>
+  </section>
+
+  <section class="shelf later" aria-labelledby="h-later">
+    <div class="shelf-head"><span class="dot"></span><h2 id="h-later">今じゃなくても</h2><span class="count" data-count="later">0</span></div>
+    <div class="zone" data-zone="later"></div>
+  </section>
+
+  <section class="shelf owned" aria-labelledby="h-owned">
+    <div class="shelf-head"><span class="dot"></span><h2 id="h-owned">既に持ってる</h2><span class="count" data-count="owned">0</span></div>
+    <div class="zone" data-zone="owned"></div>
+  </section>
+
+  <section class="share" aria-label="共有">
+    <a class="big line" id="lineLink" href="https://line.me/R/share" target="_blank" rel="noopener">LINEで送る</a>
+    <button class="big plain" type="button" id="copyBtn">テキストをコピー</button>
+    <textarea id="preview" readonly hidden aria-label="共有するテキスト"></textarea>
+    <button class="big danger" type="button" id="resetBtn">すべて消す</button>
+  </section>
+</main>
+
+<div class="scrim" id="scrim" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-label="アイテム">
+    <div class="sheet-group">
+      <div class="sheet-title"><input id="sheetName" type="text" maxlength="30" aria-label="名前を編集" enterkeyhint="done" autocomplete="off"></div>
+      <button class="row must" type="button" data-move="must"><span class="dot"></span>必要</button>
+      <button class="row want" type="button" data-move="want"><span class="dot"></span>買えたらいいな</button>
+      <button class="row later" type="button" data-move="later"><span class="dot"></span>今じゃなくても</button>
+      <button class="row owned" type="button" data-move="owned"><span class="dot"></span>既に持ってる</button>
+      <button class="row" type="button" data-move="pool"><span class="dot"></span>未分類</button>
+      <button class="row del" type="button" data-move="delete">削除</button>
+    </div>
+    <div class="sheet-group">
+      <button class="row cancel" type="button" id="sheetCancel">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
+<script>
+(function () {
+  var KEY = 'kagu-kaden-tier-v1';
+  var ORDER = ['pool', 'must', 'want', 'later', 'owned'];
+  var SHARE_ORDER = ['must', 'want', 'later', 'owned', 'pool'];
+  var LABEL = { pool: '未分類', must: '必要', want: '買えたらいいな', later: '今じゃなくても', owned: '既に持ってる' };
+  var SAMPLES = ['冷蔵庫', '洗濯機', 'ベッド', 'カーテン', '電子レンジ', '照明', 'ソファ', 'テレビ', 'ロボット掃除機'];
+
+  var state = load();
+  var selectedId = null;
+  var justDragged = false;
+
+  var zones = {};
+  ORDER.forEach(function (t) { zones[t] = document.querySelector('[data-zone="' + t + '"]'); });
+  var scrim = document.getElementById('scrim');
+  var sheetName = document.getElementById('sheetName');
+  var lineLink = document.getElementById('lineLink');
+  var preview = document.getElementById('preview');
+  var copyBtn = document.getElementById('copyBtn');
+  var resetBtn = document.getElementById('resetBtn');
+  var input = document.getElementById('nameInput');
+
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var s = JSON.parse(raw);
+        if (s && Array.isArray(s.items)) return s;
+      }
+    } catch (e) {}
+    return { items: SAMPLES.map(function (n) { return { id: uid(), name: n, tier: 'pool' }; }) };
+  }
+  function save() {
+    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {}
+  }
+  function find(id) {
+    for (var i = 0; i < state.items.length; i++) if (state.items[i].id === id) return state.items[i];
+    return null;
+  }
+
+  function render() {
+    ORDER.forEach(function (t) {
+      var z = zones[t];
+      z.textContent = '';
+      state.items.forEach(function (it) {
+        var tier = ORDER.indexOf(it.tier) >= 0 ? it.tier : 'pool';
+        if (tier !== t) return;
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'chip' + (it.id === selectedId ? ' selected' : '');
+        b.dataset.id = it.id;
+        b.textContent = it.name;
+        z.appendChild(b);
+      });
+    });
+    refresh();
+  }
+
+  function shareText() {
+    var lines = ['家具・家電の優先度リスト'];
+    SHARE_ORDER.forEach(function (t) {
+      var names = state.items.filter(function (it) { return it.tier === t; });
+      if (!names.length) return;
+      lines.push('', '【' + LABEL[t] + '】');
+      names.forEach(function (it) { lines.push('・' + it.name); });
+    });
+    return lines.join('\n');
+  }
+
+  function refresh() {
+    ORDER.forEach(function (t) {
+      var n = state.items.filter(function (it) { return it.tier === t; }).length;
+      document.querySelector('[data-count="' + t + '"]').textContent = n;
+    });
+    var text = shareText();
+    preview.value = text;
+    var empty = state.items.length === 0;
+    lineLink.href = 'https://line.me/R/share?text=' + encodeURIComponent(text);
+    lineLink.setAttribute('aria-disabled', empty ? 'true' : 'false');
+    copyBtn.disabled = empty;
+    var sel = selectedId && find(selectedId);
+    if (sel) { if (scrim.hidden) sheetName.value = sel.name; scrim.hidden = false; }
+    else { selectedId = null; scrim.hidden = true; }
+  }
+
+  function syncFromDom() {
+    var next = [];
+    ORDER.forEach(function (t) {
+      zones[t].querySelectorAll('.chip').forEach(function (el) {
+        var it = find(el.dataset.id);
+        if (it) { it.tier = t; next.push(it); }
+      });
+    });
+    state.items = next;
+    save();
+    refresh();
+  }
+
+  function moveSelected(tier) {
+    var it = selectedId && find(selectedId);
+    if (!it) return;
+    state.items = state.items.filter(function (x) { return x.id !== it.id; });
+    if (tier !== 'delete') { it.tier = tier; state.items.push(it); }
+    selectedId = null;
+    save();
+    render();
+  }
+  function closeSheet() { selectedId = null; render(); }
+
+  document.getElementById('addForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var name = input.value.trim();
+    if (!name) { input.focus(); return; }
+    state.items.push({ id: uid(), name: name, tier: 'pool' });
+    input.value = '';
+    save();
+    render();
+    input.focus();
+  });
+
+  // tap a piece to open the action sheet
+  document.querySelector('main').addEventListener('click', function (e) {
+    if (justDragged) return;
+    var chip = e.target.closest('.chip');
+    if (chip && chip.dataset.id) { selectedId = chip.dataset.id; render(); }
+  });
+  scrim.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-move]');
+    if (b) { moveSelected(b.dataset.move); return; }
+    if (e.target === scrim || e.target.closest('#sheetCancel')) closeSheet();
+  });
+  // rename from the sheet; an empty name keeps the old one
+  sheetName.addEventListener('input', function () {
+    var it = selectedId && find(selectedId);
+    var v = sheetName.value.trim();
+    if (!it || !v) return;
+    it.name = v;
+    save();
+    zones[it.tier] && zones[it.tier].querySelectorAll('.chip').forEach(function (c) {
+      if (c.dataset.id === it.id) c.textContent = v;
+    });
+    refresh();
+  });
+  sheetName.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); closeSheet(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && selectedId) closeSheet();
+  });
+
+  var copyTimer;
+  copyBtn.addEventListener('click', function () {
+    var done = function (msg) {
+      copyBtn.textContent = msg;
+      clearTimeout(copyTimer);
+      copyTimer = setTimeout(function () { copyBtn.textContent = 'テキストをコピー'; }, 1800);
+    };
+    var fail = function () {
+      preview.hidden = false;
+      preview.focus(); preview.select();
+      done('下の文章を選択してコピー');
+    };
+    try {
+      navigator.clipboard.writeText(preview.value).then(function () { done('コピーしました'); }, fail);
+    } catch (err) { fail(); }
+  });
+
+  var armed = false, armTimer;
+  resetBtn.addEventListener('click', function () {
+    if (!armed) {
+      armed = true;
+      resetBtn.textContent = 'もう一度押すと全部消えます';
+      armTimer = setTimeout(function () { armed = false; resetBtn.textContent = 'すべて消す'; }, 3000);
+      return;
+    }
+    clearTimeout(armTimer);
+    armed = false;
+    resetBtn.textContent = 'すべて消す';
+    state = { items: [] };
+    selectedId = null;
+    save();
+    render();
+  });
+
+  if (window.Sortable) {
+    ORDER.forEach(function (t) {
+      Sortable.create(zones[t], {
+        group: 'tiers',
+        animation: 180,
+        draggable: '.chip',
+        delay: 120,
+        delayOnTouchOnly: true,
+        touchStartThreshold: 4,
+        forceFallback: true,
+        fallbackOnBody: true,
+        fallbackTolerance: 4,
+        ghostClass: 'ghost',
+        dragClass: 'dragging',
+        onEnd: function () {
+          justDragged = true;
+          setTimeout(function () { justDragged = false; }, 80);
+          syncFromDom();
+        }
+      });
+    });
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>
